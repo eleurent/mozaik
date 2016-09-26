@@ -53,8 +53,11 @@ def scale(data, ratio):
 def rmse(image, reference):
     return np.linalg.norm(reference - np.asarray(image, dtype=np.float32))
 
-def loadImage(filename):
-    return cv2.imread(filename)
+def loadImage(filename, maxWidth):
+    img = cv2.imread(filename)
+    if img.shape[1] > maxWidth:
+        img = cv2.resize(img, (0,0), fx=float(maxWidth)/img.shape[1], fy=float(maxWidth)/img.shape[1])
+    return img
 
 def randomGeneration(img, shapesCount, iterations):
     reference = np.asarray(img, dtype=np.float32)
@@ -112,7 +115,7 @@ def main(argv):
         sys.exit(2)
     else:
         random.seed()
-        img = loadImage(inputfile)
+        img = loadImage(inputfile, 720)
         # result = randomGeneration(img, shapesCount, iterations=1000)
         result = annealingGeneration(img, shapesCount, randomIterations=40, T0=50, Tf=1, tau=0.97)
         # result = annealingGeneration(img, shapesCount, randomIterations=400, T0=50, Tf=0.1, tau=0.99)
