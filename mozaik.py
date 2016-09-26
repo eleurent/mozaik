@@ -115,10 +115,14 @@ def main(argv):
         # result = randomGeneration(img, shapesCount, iterations=1000)
         result = annealingGeneration(img, shapesCount, randomIterations=40, T0=50, Tf=1, tau=0.97)
         # result = annealingGeneration(img, shapesCount, randomIterations=400, T0=50, Tf=0.1, tau=0.99)
+
+        if not outputfile:
+            outputfile = 'out_{}_{:1.0f}.png'.format(shapesCount, rmse(result, np.asarray(img, dtype=np.float32)))
+        cv2.imwrite(outputfile, result)
+
         plt.axis('off')
         plt.imshow(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
         plt.show()
-        cv2.imwrite(outputfile, result)
 
 
 if __name__ == "__main__":
