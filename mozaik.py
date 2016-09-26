@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import random
+import os
 
 class RectanglePrimitive:
     def __init__(self, positionA, positionB, color, alpha):
@@ -117,7 +118,7 @@ def main(argv):
         # result = annealingGeneration(img, shapesCount, randomIterations=400, T0=50, Tf=0.1, tau=0.99)
 
         if not outputfile:
-            outputfile = 'out_{}_{:1.0f}.png'.format(shapesCount, rmse(result, np.asarray(img, dtype=np.float32)))
+            outputfile = '{}_{}_{:1.0f}.png'.format(os.path.splitext(os.path.basename(inputfile))[0], shapesCount, rmse(result, np.asarray(img, dtype=np.float32)))
         cv2.imwrite(outputfile, result)
 
         plt.axis('off')
