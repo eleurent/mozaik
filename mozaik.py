@@ -53,26 +53,33 @@ def scale(data, ratio):
 def rmse(image, reference):
     return np.linalg.norm(reference - np.asarray(image, dtype=np.float32))
 
-def loadImage(filename, maxWidth):
-    img = cv2.imread(filename)
-    if img.shape[1] > maxWidth:
-        img = cv2.resize(img, (0,0), fx=float(maxWidth)/img.shape[1], fy=float(maxWidth)/img.shape[1])
+def loadImage(filename):
+    return cv2.imread(filename)
+
+def resize(img, maxSize):
+    if img.shape[1] > maxSize:
+        img = cv2.resize(img, (0,0), fx=float(maxSize)/img.shape[1], fy=float(maxSize)/img.shape[1])
+    if img.shape[0] > maxSize:
+        img = cv2.resize(img, (0,0), fx=float(maxSize)/img.shape[0], fy=float(maxSize)/img.shape[0])
     return img
 
 def randomGeneration(img, shapesCount, iterations):
-    reference = np.asarray(img, dtype=np.float32)
-    canvas = np.zeros(img.shape, np.uint8)
+    reference = np.asarray(resize(img, maxSize), dtype=np.float32)
+    canvas = np.zeros(reference.shape, np.uint8)
+    result = np.zeros(img.shape, np.uint8)
     for i in range(shapesCount):
         shapes = [RectanglePrimitive.generateRandom() for k in range(iterations)]
         results = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
         bestShape = shapes[results.argmin()]
         canvas = bestShape.apply(canvas)
+        result = bestShape.apply(result)
         print '({}/{}) Canvas error: {}'.format(i+1, shapesCount, rmse(canvas, reference))
-    return canvas
+    return result
 
-def annealingGeneration(img, shapesCount, randomIterations, T0, Tf, tau):
-    reference = np.asarray(img, dtype=np.float32)
-    canvas = np.zeros(img.shape, np.uint8)
+def annealingGeneration(img, shapesCount, maxSize, randomIterations, T0, Tf, tau):
+    reference = np.asarray(resize(img, maxSize), dtype=np.float32)
+    canvas = np.zeros(reference.shape, np.uint8)
+    result = np.zeros(img.shape, np.uint8)
     for i in range(shapesCount):
         shapes = [RectanglePrimitive.generateRandom() for k in range(randomIterations)]
         results = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
@@ -88,8 +95,9 @@ def annealingGeneration(img, shapesCount, randomIterations, T0, Tf, tau):
                 energy = newEnergy
             T = tau*T
         canvas = shape.apply(canvas)
+        result = shape.apply(result)
         print '({}/{}) Canvas error: {:1.0f}'.format(i+1, shapesCount, rmse(canvas, reference))
-    return canvas
+    return result
 
 def main(argv):
     inputfile = ''
@@ -115,9 +123,9 @@ def main(argv):
         sys.exit(2)
     else:
         random.seed()
-        img = loadImage(inputfile, 720)
-        # result = randomGeneration(img, shapesCount, iterations=1000)
-        result = annealingGeneration(img, shapesCount, randomIterations=40, T0=50, Tf=1, tau=0.97)
+        img = loadImage(inputfile)
+        # result = randomGeneration(img, shapesCount, maxSize=720, iterations=1000)
+        result = annealingGeneration(img, shapesCount, maxSize=720, randomIterations=40, T0=50, Tf=1, tau=0.97)
         # result = annealingGeneration(img, shapesCount, randomIterations=400, T0=50, Tf=0.1, tau=0.99)
 
         if not outputfile:
