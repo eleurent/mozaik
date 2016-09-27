@@ -7,7 +7,21 @@ import cv2
 import random
 import os
 
-class RectanglePrimitive:
+class Primitive:
+    def apply(self, img):
+        raise NotImplementedError()
+
+    def generateNeighbour(self):
+        raise NotImplementedError()
+
+    @staticmethod
+    def generateRandom():
+        raise NotImplementedError()
+
+    def __str__(self):
+        raise NotImplementedError()
+
+class RectanglePrimitive(Primitive):
     def __init__(self, positionA, positionB, color, alpha):
         self.positionA = positionA
         self.positionB = positionB
@@ -26,26 +40,68 @@ class RectanglePrimitive:
         WINDOW = 0.1
         def eps():
             return WINDOW*(2*random.random()-1)
-        size = np.absolute(np.array(self.positionB)-np.array(self.positionA))
-        center = (np.array(self.positionA)+np.array(self.positionB))/2
+        size = np.absolute(self.positionB-self.positionA)
+        center = (self.positionA+self.positionB)/2
         size = np.clip(size*np.array([1+eps(), 1+eps()]), 0.05, 1)
         center += np.array([eps(), eps()])
         positionA = np.clip(center-size/2, 0, 1)
         positionB = np.clip(center+size/2, 0, 1)
-        color = np.clip(np.asarray(self.color)+np.array([eps(), eps(), eps()]), 0, 1)
+        color = np.clip(self.color+np.array([eps(), eps(), eps()]), 0, 1)
         alpha = np.clip(self.alpha+eps(), 0, 1)
         return RectanglePrimitive(positionA, positionB, color, alpha)
 
     @staticmethod
     def generateRandom():
-        positionA = (random.random(), random.random())
-        positionB = (random.random(), random.random())
-        color = (random.random(), random.random(), random.random())
+        positionA = np.array([random.random(), random.random()])
+        positionB = np.array([random.random(), random.random()])
+        color = np.array([random.random(), random.random(), random.random()])
         alpha = random.random()
         return RectanglePrimitive(positionA, positionB, color, alpha)
 
     def __str__(self):
         return '{} {} - {} x {}'.format(self.positionA, self.positionB, self.color, self.alpha)
+
+class TrianglePrimitive(Primitive):
+    def __init__(self, positionA, positionB, positionC, color, alpha):
+        self.positionA = positionA
+        self.positionB = positionB
+        self.positionC = positionC
+        self.color = color
+        self.alpha = alpha
+
+    def apply(self, img):
+        overlay = img.copy()
+        output = img.copy()
+        size = img.shape[1::-1]
+        pts = np.array([scale(self.positionA, size), scale(self.positionB, size), scale(self.positionC, size)], np.int32).reshape((-1,1,2))
+        cv2.fillConvexPoly(overlay,pts,scale(self.color, 255))
+        cv2.addWeighted(overlay, self.alpha, output, 1 - self.alpha, 0, output)
+        return output
+
+    def generateNeighbour(self):
+        WINDOW = 0.1
+        def eps():
+            return WINDOW*(2*random.random()-1)
+        center = (self.positionA+self.positionB+self.positionC)/3
+        rel = [self.positionA-center, self.positionB-center, self.positionC-center]
+        center += np.array([eps(), eps()])
+        rel *= np.array([1+eps(), 1+eps()])
+        positionA = np.clip(center+rel[0], 0, 1)
+        positionB = np.clip(center+rel[1], 0, 1)
+        positionC = np.clip(center+rel[2], 0, 1)
+        color = np.clip(np.asarray(self.color)+np.array([eps(), eps(), eps()]), 0, 1)
+        alpha = np.clip(self.alpha+eps(), 0, 1)
+        return TrianglePrimitive(positionA, positionB, positionC, color, alpha)
+        pass
+
+    @staticmethod
+    def generateRandom():
+        positionA = np.array([random.random(), random.random()])
+        positionB = np.array([random.random(), random.random()])
+        positionC = np.array([random.random(), random.random()])
+        color = np.array([random.random(), random.random(), random.random()])
+        alpha = random.random()
+        return TrianglePrimitive(positionA, positionB, positionC, color, alpha)
 
 def scale(data, ratio):
     return tuple((np.asarray(data)*np.asarray(ratio)).astype(int))
@@ -63,12 +119,12 @@ def resize(img, maxSize):
         img = cv2.resize(img, (0,0), fx=float(maxSize)/img.shape[0], fy=float(maxSize)/img.shape[0])
     return img
 
-def randomGeneration(img, shapesCount, iterations):
+def randomGeneration(img, shapesCount, primitive, maxSize, randomIterations):
     reference = np.asarray(resize(img, maxSize), dtype=np.float32)
     canvas = np.zeros(reference.shape, np.uint8)
     result = np.zeros(img.shape, np.uint8)
     for i in range(shapesCount):
-        shapes = [RectanglePrimitive.generateRandom() for k in range(iterations)]
+        shapes = [primitive.generateRandom() for k in range(randomIterations)]
         results = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
         bestShape = shapes[results.argmin()]
         canvas = bestShape.apply(canvas)
@@ -76,12 +132,12 @@ def randomGeneration(img, shapesCount, iterations):
         print '({}/{}) Canvas error: {}'.format(i+1, shapesCount, rmse(canvas, reference))
     return result
 
-def annealingGeneration(img, shapesCount, maxSize, randomIterations, T0, Tf, tau):
+def annealingGeneration(img, shapesCount, primitive, maxSize, randomIterations, T0, Tf, tau):
     reference = np.asarray(resize(img, maxSize), dtype=np.float32)
     canvas = np.zeros(reference.shape, np.uint8)
     result = np.zeros(img.shape, np.uint8)
     for i in range(shapesCount):
-        shapes = [RectanglePrimitive.generateRandom() for k in range(randomIterations)]
+        shapes = [primitive.generateRandom() for k in range(randomIterations)]
         results = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
         shape = shapes[results.argmin()]
         energy = rmse(shape.apply(canvas), reference)
@@ -103,8 +159,9 @@ def main(argv):
     inputfile = ''
     outputfile = ''
     shapesCount = 200
+    primitive = RectanglePrimitive
     try:
-        opts, args = getopt.getopt(argv,"hi:o:",["input=","output="])
+        opts, args = getopt.getopt(argv,"hi:o:c:p:",["input=","output=","count=","primitive="])
     except getopt.GetoptError:
         print 'mozaik.py -i <inputfile> -o <outputfile>'
         sys.exit(2)
@@ -116,17 +173,25 @@ def main(argv):
             inputfile = arg
         elif opt in ("-o", "--output"):
             outputfile = arg
-        elif opts in ("-c", "--count"):
-            shapesCount = arg
+        elif opt in ("-c", "--count"):
+            shapesCount = int(arg)
+        elif opt in ("-p", "--primitive"):
+            if arg == "rectangle":
+                primitive = RectanglePrimitive
+            elif arg == "triangle":
+                primitive = TrianglePrimitive
+            else:
+                print 'Primitive not recognized'
+                sys.exit(2)
     if not inputfile:
         print 'mozaik.py -i <inputfile> -o <outputfile>'
         sys.exit(2)
     else:
         random.seed()
         img = loadImage(inputfile)
-        # result = randomGeneration(img, shapesCount, maxSize=720, iterations=1000)
-        result = annealingGeneration(img, shapesCount, maxSize=720, randomIterations=40, T0=50, Tf=1, tau=0.97)
-        # result = annealingGeneration(img, shapesCount, randomIterations=400, T0=50, Tf=0.1, tau=0.99)
+        # result = randomGeneration(img, shapesCount, primitive, maxSize=720, randomIterations=1000)
+        result = annealingGeneration(img, shapesCount, primitive, maxSize=720, randomIterations=40, T0=50, Tf=1, tau=0.97)
+        # result = annealingGeneration(img, shapesCount, primitive, maxSize=720, randomIterations=400, T0=50, Tf=0.1, tau=0.99)
 
         if not outputfile:
             outputfile = '{}_{}_{:1.0f}.png'.format(os.path.splitext(os.path.basename(inputfile))[0], shapesCount, rmse(result, np.asarray(img, dtype=np.float32)))
