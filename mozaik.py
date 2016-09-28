@@ -7,16 +7,17 @@ import cv2
 import random
 import os
 
-class Primitive:
+class Primitive(object):
     def apply(self, img):
         raise NotImplementedError()
 
     def generateNeighbour(self):
         raise NotImplementedError()
 
-    @staticmethod
-    def generateRandom():
-        raise NotImplementedError()
+    @classmethod
+    def generateRandom(cls):
+        # raise NotImplementedError()
+        pass
 
     def __str__(self):
         raise NotImplementedError()
@@ -50,8 +51,8 @@ class RectanglePrimitive(Primitive):
         alpha = np.clip(self.alpha+eps(), 0, 1)
         return RectanglePrimitive(positionA, positionB, color, alpha)
 
-    @staticmethod
-    def generateRandom():
+    @classmethod
+    def generateRandom(cls):
         positionA = np.array([random.random(), random.random()])
         positionB = np.array([random.random(), random.random()])
         color = np.array([random.random(), random.random(), random.random()])
@@ -92,10 +93,9 @@ class TrianglePrimitive(Primitive):
         color = np.clip(np.asarray(self.color)+np.array([eps(), eps(), eps()]), 0, 1)
         alpha = np.clip(self.alpha+eps(), 0, 1)
         return TrianglePrimitive(positionA, positionB, positionC, color, alpha)
-        pass
 
-    @staticmethod
-    def generateRandom():
+    @classmethod
+    def generateRandom(cls):
         positionA = np.array([random.random(), random.random()])
         positionB = np.array([random.random(), random.random()])
         positionC = np.array([random.random(), random.random()])
