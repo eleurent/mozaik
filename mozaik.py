@@ -198,8 +198,30 @@ def randomGeneration(img, shapesCount, primitive, maxSize, randomIterations):
     result = np.zeros(img.shape, np.uint8)
     for i in range(shapesCount):
         shapes = [primitive.generateRandom() for k in range(randomIterations)]
-        results = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
-        bestShape = shapes[results.argmin()]
+        energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
+        bestShape = shapes[energies.argmin()]
+        canvas = bestShape.apply(canvas)
+        result = bestShape.apply(result)
+        print '({}/{}) Canvas error: {}'.format(i+1, shapesCount, rmse(canvas, reference))
+    return result
+
+def hillClimbGeneration(img, shapesCount, primitive, maxSize, randomIterations, hillClimbIterations):
+    reference = np.asarray(resize(img, maxSize), dtype=np.float32)
+    canvas = np.zeros(reference.shape, np.uint8)
+    result = np.zeros(img.shape, np.uint8)
+    for i in range(shapesCount):
+        shapes = [primitive.generateRandom() for k in range(randomIterations)]
+        for j, shape in enumerate(shapes):
+            energy = rmse(shape.apply(canvas), reference)
+            for k in range(hillClimbIterations):
+                newShape = shape.generateNeighbour()
+                newEnergy = rmse(newShape.apply(canvas), reference)
+                if newEnergy < energy:
+                    shape = newShape
+                    energy = newEnergy
+                shapes[j] = shape
+        energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
+        bestShape = shapes[energies.argmin()]
         canvas = bestShape.apply(canvas)
         result = bestShape.apply(result)
         print '({}/{}) Canvas error: {}'.format(i+1, shapesCount, rmse(canvas, reference))
@@ -211,8 +233,9 @@ def annealingGeneration(img, shapesCount, primitive, maxSize, randomIterations, 
     result = np.zeros(img.shape, np.uint8)
     for i in range(shapesCount):
         shapes = [primitive.generateRandom() for k in range(randomIterations)]
-        results = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
-        shape = shapes[results.argmin()]
+        energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
+        k = energies.argmin()
+        shape = shapes[k]
         energy = rmse(shape.apply(canvas), reference)
         # print "Selected random seed: {}".format(energy)
         T = T0
@@ -267,9 +290,11 @@ def main(argv):
     else:
         random.seed()
         img = loadImage(inputfile)
-        # result = randomGeneration(img, shapesCount, primitive, maxSize=720, randomIterations=1000)
-        result = annealingGeneration(img, shapesCount, primitive, maxSize=720, randomIterations=40, T0=50, Tf=1, tau=0.97)
-        # result = annealingGeneration(img, shapesCount, primitive, maxSize=720, randomIterations=400, T0=50, Tf=0.1, tau=0.99)
+        # result = randomGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=4000)
+        # result = annealingGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=40, T0=50, Tf=1, tau=0.97)
+        # result = annealingGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=400, T0=30, Tf=0.01, tau=0.99)
+        result = hillClimbGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=100, hillClimbIterations=10)
+
 
         if not outputfile:
             outputfile = '{}_{}_{:1.0f}.png'.format(os.path.splitext(os.path.basename(inputfile))[0], shapesCount, rmse(result, np.asarray(img, dtype=np.float32)))
