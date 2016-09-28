@@ -204,14 +204,15 @@ def main(argv):
     outputfile = ''
     shapesCount = 200
     primitive = RectanglePrimitive
+    man = 'mozaik.py -i <inputfile> [-o <outputfile> -c <shapeCounts> -p <primitive>]'
     try:
         opts, args = getopt.getopt(argv,"hi:o:c:p:",["input=","output=","count=","primitive="])
     except getopt.GetoptError:
-        print 'mozaik.py -i <inputfile> -o <outputfile>'
+        print man
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'mozaik.py -i <inputfile> -o <outputfile>'
+            print man
             sys.exit()
         elif opt in ("-i", "--input"):
             inputfile = arg
@@ -226,11 +227,13 @@ def main(argv):
                 primitive = TrianglePrimitive
             elif arg == "ellipse":
                 primitive = EllipsePrimitive
+            elif arg == "circle":
+                primitive = CirclePrimitive
             else:
                 print 'Primitive not recognized'
                 sys.exit(2)
     if not inputfile:
-        print 'mozaik.py -i <inputfile> -o <outputfile>'
+        print man
         sys.exit(2)
     else:
         random.seed()
