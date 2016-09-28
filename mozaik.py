@@ -103,6 +103,50 @@ class TrianglePrimitive(Primitive):
         alpha = random.random()
         return TrianglePrimitive(positionA, positionB, positionC, color, alpha)
 
+    def __str__(self):
+        return '{} {} {} - {} x {}'.format(self.positionA, self.positionB, self.positionC, self.color, self.alpha)
+
+
+class EllipsePrimitive(Primitive):
+    def __init__(self, center, axes, angle, color, alpha):
+        self.center = center
+        self.axes = axes
+        self.angle = angle
+        self.color = color
+        self.alpha = alpha
+
+    def apply(self, img):
+        overlay = img.copy()
+        output = img.copy()
+        size = img.shape[1::-1]
+        cv2.ellipse(overlay,scale(self.center, size),scale(self.axes, size),self.angle*360,0,360,scale(self.color, 255),-1)
+        cv2.addWeighted(overlay, self.alpha, output, 1 - self.alpha, 0, output)
+        return output
+
+    def generateNeighbour(self):
+        WINDOW = 0.1
+        def eps():
+            return WINDOW*(2*random.random()-1)
+        center = self.center + np.array([eps(), eps()])
+        axes = self.axes * np.array([1+eps(), 1+eps()])
+        angle = np.clip(self.alpha+eps(), 0, 1)
+        color = np.clip(np.asarray(self.color)+np.array([eps(), eps(), eps()]), 0, 1)
+        alpha = np.clip(self.alpha+eps(), 0, 1)
+        return EllipsePrimitive(center, axes, angle, color, alpha)
+
+    @classmethod
+    def generateRandom(cls):
+        center = np.array([random.random(), random.random()])
+        axes = np.array([random.random()/2, random.random()/2])
+        angle = random.random()
+        color = np.array([random.random(), random.random(), random.random()])
+        alpha = random.random()
+        return EllipsePrimitive(center, axes, angle, color, alpha)
+
+    def __str__(self):
+        return '{} {} {} - {} x {}'.format(self.center, self.axes, self.angle, self.color, self.alpha)
+
+
 def scale(data, ratio):
     return tuple((np.asarray(data)*np.asarray(ratio)).astype(int))
 
@@ -180,6 +224,8 @@ def main(argv):
                 primitive = RectanglePrimitive
             elif arg == "triangle":
                 primitive = TrianglePrimitive
+            elif arg == "ellipse":
+                primitive = EllipsePrimitive
             else:
                 print 'Primitive not recognized'
                 sys.exit(2)
