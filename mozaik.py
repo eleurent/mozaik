@@ -147,6 +147,35 @@ class EllipsePrimitive(Primitive):
         return '{} {} {} - {} x {}'.format(self.center, self.axes, self.angle, self.color, self.alpha)
 
 
+class CirclePrimitive(EllipsePrimitive):
+    def __init__(self, center, axes, angle, color, alpha):
+        super(CirclePrimitive, self).__init__(center, np.array(axes[0], axes[0]), angle, color, alpha)
+
+    def apply(self, img):
+        overlay = img.copy()
+        output = img.copy()
+        size = img.shape[1::-1]
+        cv2.ellipse(overlay,scale(self.center, size),scale(self.axes, size[0]),self.angle*360,0,360,scale(self.color, 255),-1)
+        cv2.addWeighted(overlay, self.alpha, output, 1 - self.alpha, 0, output)
+        return output
+
+    def generateNeighbour(self):
+        neighbour = super(CirclePrimitive, self).generateNeighbour()
+        neighbour.__class__ = CirclePrimitive
+        neighbour.axes[1] = neighbour.axes[0]
+        return neighbour
+
+    @classmethod
+    def generateRandom(cls):
+        neighbour = super(CirclePrimitive, cls).generateRandom()
+        neighbour.__class__ = CirclePrimitive
+        neighbour.axes[1] = neighbour.axes[0]
+        return neighbour
+
+    def __str__(self):
+        return super(CirclePrimitive, self).__str__()
+
+
 def scale(data, ratio):
     return tuple((np.asarray(data)*np.asarray(ratio)).astype(int))
 
