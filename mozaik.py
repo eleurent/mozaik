@@ -25,10 +25,10 @@ class Primitive(object):
 
 class RectanglePrimitive(Primitive):
     def __init__(self, positionA, positionB, color, alpha):
-        self.positionA = positionA
-        self.positionB = positionB
-        self.color = color
-        self.alpha = alpha
+        self.positionA = np.clip(positionA, 0, 1)
+        self.positionB = np.clip(positionB, 0, 1)
+        self.color = np.clip(color, 0, 1)
+        self.alpha = np.clip(alpha, 0, 1)
 
     def apply(self, img):
         overlay = img.copy()
@@ -46,10 +46,10 @@ class RectanglePrimitive(Primitive):
         center = (self.positionA+self.positionB)/2
         size = np.clip(size*np.array([1+eps(), 1+eps()]), 0.05, 1)
         center += np.array([eps(), eps()])
-        positionA = np.clip(center-size/2, 0, 1)
-        positionB = np.clip(center+size/2, 0, 1)
-        color = np.clip(self.color+np.array([eps(), eps(), eps()]), 0, 1)
-        alpha = np.clip(self.alpha+eps(), 0, 1)
+        positionA = center-size/2
+        positionB = center+size/2
+        color = self.color+np.array([eps(), eps(), eps()])
+        alpha = self.alpha+eps()
         return RectanglePrimitive(positionA, positionB, color, alpha)
 
     @classmethod
@@ -65,11 +65,11 @@ class RectanglePrimitive(Primitive):
 
 class TrianglePrimitive(Primitive):
     def __init__(self, positionA, positionB, positionC, color, alpha):
-        self.positionA = positionA
-        self.positionB = positionB
-        self.positionC = positionC
-        self.color = color
-        self.alpha = alpha
+        self.positionA = np.clip(positionA, 0, 1)
+        self.positionB = np.clip(positionB, 0, 1)
+        self.positionC = np.clip(positionC, 0, 1)
+        self.color = np.clip(color, 0, 1)
+        self.alpha = np.clip(alpha, 0, 1)
 
     def apply(self, img):
         overlay = img.copy()
@@ -88,11 +88,11 @@ class TrianglePrimitive(Primitive):
         rel = [self.positionA-center, self.positionB-center, self.positionC-center]
         center += np.array([eps(), eps()])
         rel *= np.array([1+eps(), 1+eps()])
-        positionA = np.clip(center+rel[0], 0, 1)
-        positionB = np.clip(center+rel[1], 0, 1)
-        positionC = np.clip(center+rel[2], 0, 1)
-        color = np.clip(np.asarray(self.color)+np.array([eps(), eps(), eps()]), 0, 1)
-        alpha = np.clip(self.alpha+eps(), 0, 1)
+        positionA = center+rel[0]
+        positionB = center+rel[1]
+        positionC = center+rel[2]
+        color = np.asarray(self.color)+np.array([eps(), eps(), eps()])
+        alpha = self.alpha+eps()
         return TrianglePrimitive(positionA, positionB, positionC, color, alpha)
 
     @classmethod
@@ -111,10 +111,10 @@ class TrianglePrimitive(Primitive):
 class EllipsePrimitive(Primitive):
     def __init__(self, center, axes, angle, color, alpha):
         self.center = center
-        self.axes = axes
-        self.angle = angle
-        self.color = color
-        self.alpha = alpha
+        self.axes = np.clip(axes, 0.01, 1)
+        self.angle = np.clip(angle, 0, 1)
+        self.color = np.clip(color, 0, 1)
+        self.alpha = np.clip(alpha, 0, 1)
 
     def apply(self, img):
         overlay = img.copy()
@@ -130,9 +130,9 @@ class EllipsePrimitive(Primitive):
             return WINDOW*(2*random.random()-1)
         center = self.center + np.array([eps(), eps()])
         axes = self.axes * np.array([1+eps(), 1+eps()])
-        angle = np.clip(self.alpha+eps(), 0, 1)
-        color = np.clip(np.asarray(self.color)+np.array([eps(), eps(), eps()]), 0, 1)
-        alpha = np.clip(self.alpha+eps(), 0, 1)
+        angle = self.alpha+eps()
+        color = self.color+np.array([eps(), eps(), eps()])
+        alpha = self.alpha+eps()
         return EllipsePrimitive(center, axes, angle, color, alpha)
 
     @classmethod
