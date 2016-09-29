@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import cv2
 import random
 import os
+import math
 
 class Primitive(object):
     def apply(self, img):
@@ -160,20 +161,44 @@ class CirclePrimitive(EllipsePrimitive):
         return output
 
     def generateNeighbour(self):
-        neighbour = super(CirclePrimitive, self).generateNeighbour()
-        neighbour.__class__ = CirclePrimitive
-        neighbour.axes[1] = neighbour.axes[0]
-        return neighbour
+        ellipse = super(CirclePrimitive, self).generateNeighbour()
+        return CirclePrimitive(ellipse.center, ellipse.axes, ellipse.angle, ellipse.color, ellipse.alpha)
 
     @classmethod
     def generateRandom(cls):
-        neighbour = super(CirclePrimitive, cls).generateRandom()
-        neighbour.__class__ = CirclePrimitive
-        neighbour.axes[1] = neighbour.axes[0]
-        return neighbour
+        ellipse = super(CirclePrimitive, cls).generateRandom()
+        return CirclePrimitive(ellipse.center, ellipse.axes, ellipse.angle, ellipse.color, ellipse.alpha)
 
     def __str__(self):
         return super(CirclePrimitive, self).__str__()
+
+
+class SquarePrimitive(RectanglePrimitive):
+    def __init__(self, positionA, positionB, color, alpha):
+        super(SquarePrimitive, self).__init__(positionA, positionB, color, alpha)
+
+    def apply(self, img):
+        overlay = img.copy()
+        output = img.copy()
+        size = img.shape[1::-1]
+        center = (self.positionA+self.positionB)/2*size
+        side = math.sqrt(abs(np.prod(self.positionB-self.positionA)*np.prod(size)))
+        cv2.rectangle(overlay,scale(center+side/2,1),scale(center-side/2,1),scale(self.color, 255),-1)
+        cv2.addWeighted(overlay, self.alpha, output, 1 - self.alpha, 0, output)
+        return output
+
+    def generateNeighbour(self):
+        rectangle = super(SquarePrimitive, self).generateNeighbour()
+        return SquarePrimitive(rectangle.positionA, rectangle.positionB, rectangle.color, rectangle.alpha)
+
+    @classmethod
+    def generateRandom(cls):
+        rectangle = super(SquarePrimitive, cls).generateRandom()
+        return SquarePrimitive(rectangle.positionA, rectangle.positionB, rectangle.color, rectangle.alpha)
+
+    def __str__(self):
+        return super(SquarePrimitive, self).__str__()
+
 
 
 def scale(data, ratio):
@@ -287,6 +312,8 @@ def main(argv):
                 primitive = EllipsePrimitive
             elif arg == "circle":
                 primitive = CirclePrimitive
+            elif arg == "square":
+                primitive = SquarePrimitive
             else:
                 print 'Primitive not recognized'
                 sys.exit(2)
