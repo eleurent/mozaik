@@ -17,8 +17,22 @@ class Primitive(object):
 
     @classmethod
     def generateRandom(cls):
-        # raise NotImplementedError()
-        pass
+        raise NotImplementedError()
+
+    @classmethod
+    def generateFromState(cls, X):
+        raise NotImplementedError()
+
+    def getState(self):
+        raise NotImplementedError()
+
+    def computeGradient(self, h, canvas, reference):
+        energy = rmse(self.apply(canvas), reference)
+        X = self.getState()
+        I = np.identity(X.size)
+        Xh = X+I*h
+        g = (np.array([rmse(self.__class__.generateFromState(Xh[i,:]).apply(canvas), reference) for i in range(X.size)]) - energy)/h
+        return g
 
     def __str__(self):
         raise NotImplementedError()
@@ -59,6 +73,19 @@ class RectanglePrimitive(Primitive):
         color = np.array([random.random(), random.random(), random.random()])
         alpha = random.random()
         return RectanglePrimitive(positionA, positionB, color, alpha)
+
+    @classmethod
+    def generateFromState(cls, X):
+        if X.size != 8:
+            return None
+        return RectanglePrimitive(np.array([X[0],X[1]]),
+            np.array([X[2],X[3]]),
+            np.array([X[4],X[5],X[6]]),
+            X[7])
+
+    def getState(self):
+        return np.hstack((self.positionA, self.positionB, self.color, self.alpha))
+
 
     def __str__(self):
         return '{} {} - {} x {}'.format(self.positionA, self.positionB, self.color, self.alpha)
@@ -103,6 +130,19 @@ class TrianglePrimitive(Primitive):
         color = np.array([random.random(), random.random(), random.random()])
         alpha = random.random()
         return TrianglePrimitive(positionA, positionB, positionC, color, alpha)
+
+    @classmethod
+    def generateFromState(cls, X):
+        if X.size != 10:
+            return None
+        return TrianglePrimitive(np.array([X[0],X[1]]),
+            np.array([X[2],X[3]]),
+            np.array([X[4],X[5]]),
+            np.array([X[6],X[7],X[8]]),
+            X[9])
+
+    def getState(self):
+        return np.hstack((self.positionA, self.positionB, self.positionC, self.color, self.alpha))
 
     def __str__(self):
         return '{} {} {} - {} x {}'.format(self.positionA, self.positionB, self.positionC, self.color, self.alpha)
@@ -282,6 +322,33 @@ def annealingGeneration(img, shapesCount, primitive, maxSize, randomIterations, 
         print '({}/{}) Canvas error: {:1.0f}'.format(i+1, shapesCount, rmse(canvas, reference))
     return result
 
+def gradientGeneration(img, shapesCount, primitive, maxSize, randomIterations):
+    reference = np.asarray(resize(img, maxSize), dtype=np.float32)
+    canvas = initBackground(reference)
+    result = initBackground(img)
+    h = 0.01
+    for i in range(shapesCount):
+        shapes = [primitive.generateRandom() for k in range(randomIterations)]
+        for j, shape in enumerate(shapes):
+            energy = rmse(shape.apply(canvas), reference)
+            beta = 1.0e-6
+            while beta > 1.0e-9:
+                g = shape.computeGradient(h, canvas, reference)
+                newShape = primitive.generateFromState(shape.getState() - g*beta)
+                newEnergy = rmse(newShape.apply(canvas), reference)
+                if newEnergy < energy:
+                    shape = newShape
+                    energy = newEnergy
+                else:
+                    beta = beta*0.3
+            shapes[j] = shape
+        energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
+        bestShape = shapes[energies.argmin()]
+        canvas = bestShape.apply(canvas)
+        result = bestShape.apply(result)
+        print '({}/{}) Canvas error: {:1.0f}'.format(i+1, shapesCount, rmse(canvas, reference))
+    return result
+
 def main(argv):
     inputfile = ''
     outputfile = ''
@@ -326,7 +393,8 @@ def main(argv):
         # result = randomGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=4000)
         # result = annealingGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=40, T0=50, Tf=1, tau=0.97)
         # result = annealingGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=400, T0=30, Tf=0.01, tau=0.99)
-        result = hillClimbGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=100, hillClimbIterations=10)
+        # result = hillClimbGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=400, hillClimbIterations=40)
+        result = gradientGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=100)
 
 
         if not outputfile:
