@@ -192,23 +192,29 @@ def resize(img, maxSize):
         img = cv2.resize(img, (0,0), fx=float(maxSize)/img.shape[0], fy=float(maxSize)/img.shape[0])
     return img
 
+def initBackground(img):
+    bgImg = np.zeros(img.shape, np.uint8)
+    bgColor =  np.uint8(np.average(np.average(img, axis=0), axis=0))
+    bgImg[:,:] = bgColor
+    return bgImg
+
 def randomGeneration(img, shapesCount, primitive, maxSize, randomIterations):
     reference = np.asarray(resize(img, maxSize), dtype=np.float32)
-    canvas = np.zeros(reference.shape, np.uint8)
-    result = np.zeros(img.shape, np.uint8)
+    canvas = initBackground(reference)
+    result = initBackground(img)
     for i in range(shapesCount):
         shapes = [primitive.generateRandom() for k in range(randomIterations)]
         energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
         bestShape = shapes[energies.argmin()]
         canvas = bestShape.apply(canvas)
         result = bestShape.apply(result)
-        print '({}/{}) Canvas error: {}'.format(i+1, shapesCount, rmse(canvas, reference))
+        print '({}/{}) Canvas error: {:1.0f}'.format(i+1, shapesCount, rmse(canvas, reference))
     return result
 
 def hillClimbGeneration(img, shapesCount, primitive, maxSize, randomIterations, hillClimbIterations):
     reference = np.asarray(resize(img, maxSize), dtype=np.float32)
-    canvas = np.zeros(reference.shape, np.uint8)
-    result = np.zeros(img.shape, np.uint8)
+    canvas = initBackground(reference)
+    result = initBackground(img)
     for i in range(shapesCount):
         shapes = [primitive.generateRandom() for k in range(randomIterations)]
         for j, shape in enumerate(shapes):
@@ -224,13 +230,13 @@ def hillClimbGeneration(img, shapesCount, primitive, maxSize, randomIterations, 
         bestShape = shapes[energies.argmin()]
         canvas = bestShape.apply(canvas)
         result = bestShape.apply(result)
-        print '({}/{}) Canvas error: {}'.format(i+1, shapesCount, rmse(canvas, reference))
+        print '({}/{}) Canvas error: {:1.0f}'.format(i+1, shapesCount, rmse(canvas, reference))
     return result
 
 def annealingGeneration(img, shapesCount, primitive, maxSize, randomIterations, T0, Tf, tau):
     reference = np.asarray(resize(img, maxSize), dtype=np.float32)
-    canvas = np.zeros(reference.shape, np.uint8)
-    result = np.zeros(img.shape, np.uint8)
+    canvas = initBackground(reference)
+    result = initBackground(img)
     for i in range(shapesCount):
         shapes = [primitive.generateRandom() for k in range(randomIterations)]
         energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
