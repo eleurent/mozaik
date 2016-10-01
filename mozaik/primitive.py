@@ -186,7 +186,7 @@ class EllipsePrimitive(Primitive):
 
 class CirclePrimitive(EllipsePrimitive):
     def __init__(self, center, axes, angle, color, alpha):
-        super(CirclePrimitive, self).__init__(center, np.array(axes[0], axes[0]), angle, color, alpha)
+        super(CirclePrimitive, self).__init__(center, np.array([axes[0], axes[0]]), angle, color, alpha)
 
     def apply(self, img):
         overlay = img.copy()
