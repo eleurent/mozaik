@@ -111,7 +111,7 @@ class SimulatedAnnealingMethod(RandomMethod):
 
 
 class GradientDescentMethod(RandomMethod):
-    def __init__(self, shapesCount, primitive, maxSize, randomIterations, selectionRate=0.25, gammaInit=1.0e-5, gammaMin=1.0e-9, gammaRate=0.3, h=0.01):
+    def __init__(self, shapesCount, primitive, maxSize, randomIterations, selectionRate=0.25, gammaInit=1.0e-5, gammaMin=1.0e-7, gammaRate=0.3, h=0.01):
         super(GradientDescentMethod, self).__init__(shapesCount, primitive, maxSize, randomIterations)
         self.selectionRate = selectionRate
         self.gammaInit = gammaInit
