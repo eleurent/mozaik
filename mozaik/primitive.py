@@ -180,38 +180,60 @@ class EllipsePrimitive(Primitive):
         alpha = random.random()
         return EllipsePrimitive(center, axes, angle, color, alpha)
 
+    @classmethod
+    def generateFromState(cls, X):
+        if X.size != 9:
+            return None
+        return EllipsePrimitive(np.array([X[0],X[1]]),
+            np.array([X[2],X[3]]),
+            np.array([X[4]]),
+            np.array([X[5],X[6],X[7]]),
+            X[8])
+
+    def getState(self):
+        return np.hstack((self.center, self.axes, self.angle, self.color, self.alpha))
+
+
     def __str__(self):
         return '{} {} {} - {} x {}'.format(self.center, self.axes, self.angle, self.color, self.alpha)
 
 
 class CirclePrimitive(EllipsePrimitive):
-    def __init__(self, center, axes, angle, color, alpha):
-        super(CirclePrimitive, self).__init__(center, np.array([axes[0], axes[0]]), angle, color, alpha)
+    def __init__(self, ellipse):
+        super(CirclePrimitive, self).init(ellipse.center, ellipse.axes, ellipse.angle, ellipse.color, ellipse.alpha)
 
     def apply(self, img):
         overlay = img.copy()
         output = img.copy()
         size = img.shape[1::-1]
-        cv2.ellipse(overlay,scale(self.center, size),scale(self.axes, size[0]),self.angle*360,0,360,scale(self.color, 255),-1)
+        cv2.ellipse(overlay,scale(self.center, size),self.axes[0]*size[0]*np.ones(2,1),self.angle*360,0,360,scale(self.color, 255),-1)
         cv2.addWeighted(overlay, self.alpha, output, 1 - self.alpha, 0, output)
         return output
 
     def generateNeighbour(self):
         ellipse = super(CirclePrimitive, self).generateNeighbour()
-        return CirclePrimitive(ellipse.center, ellipse.axes, ellipse.angle, ellipse.color, ellipse.alpha)
+        return CirclePrimitive(ellipse)
 
     @classmethod
     def generateRandom(cls):
         ellipse = super(CirclePrimitive, cls).generateRandom()
-        return CirclePrimitive(ellipse.center, ellipse.axes, ellipse.angle, ellipse.color, ellipse.alpha)
+        return CirclePrimitive(ellipse)
+
+    @classmethod
+    def generateFromState(cls, X):
+        ellipse = super(CirclePrimitive, cls).generateFromState(X)
+        return CirclePrimitive(ellipse)
+
+    def getState(self):
+        return super(CirclePrimitive, self).getState()
 
     def __str__(self):
         return super(CirclePrimitive, self).__str__()
 
 
 class SquarePrimitive(RectanglePrimitive):
-    def __init__(self, positionA, positionB, color, alpha):
-        super(SquarePrimitive, self).__init__(positionA, positionB, color, alpha)
+    def __init__(self, rectangle):
+        super(SquarePrimitive, self).__init__(rectangle.positionA, rectangle.positionB, rectangle.color, rectangle.alpha)
 
     def apply(self, img):
         overlay = img.copy()
@@ -225,12 +247,20 @@ class SquarePrimitive(RectanglePrimitive):
 
     def generateNeighbour(self):
         rectangle = super(SquarePrimitive, self).generateNeighbour()
-        return SquarePrimitive(rectangle.positionA, rectangle.positionB, rectangle.color, rectangle.alpha)
+        return SquarePrimitive(rectangle)
 
     @classmethod
     def generateRandom(cls):
         rectangle = super(SquarePrimitive, cls).generateRandom()
-        return SquarePrimitive(rectangle.positionA, rectangle.positionB, rectangle.color, rectangle.alpha)
+        return SquarePrimitive(rectangle)
+
+    @classmethod
+    def generateFromState(cls, X):
+        rectangle = super(SquarePrimitive, cls).generateFromState(X)
+        return SquarePrimitive(rectangle)
+
+    def getState(self):
+        return super(SquarePrimitive, self).getState()
 
     def __str__(self):
         return super(SquarePrimitive, self).__str__()
