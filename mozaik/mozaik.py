@@ -3,21 +3,26 @@
 import sys, getopt
 import matplotlib.pyplot as plt
 import os
+import random
+import numpy as np
+import cv2
 
-from primitive import *
-from method import *
+from primitive import RectanglePrimitive, TrianglePrimitive, EllipsePrimitive, CirclePrimitive, SquarePrimitive
+from method import Method, RandomMethod, HillClimbMethod, SimulatedAnnealingMethod, GradientDescentMethod
 
 def loadImage(filename):
     return cv2.imread(filename)
 
-def main(argv):
+def parseArguments(argv):
     inputfile = ''
     outputfile = ''
     shapesCount = 200
     primitive = RectanglePrimitive
-    man = 'mozaik.py -i <inputfile> [-o <outputfile> -c <shapeCounts> -p <primitive>]'
+    method = GradientDescentMethod
+    seed = None
+    man = 'mozaik.py -i <inputfile> [-o <outputfile> -c <shapeCounts> -p <primitive> -m <method> -s <seed>]'
     try:
-        opts, args = getopt.getopt(argv,"hi:o:c:p:",["input=","output=","count=","primitive="])
+        opts, args = getopt.getopt(argv,"hi:o:c:p:m:s:",["input=","output=","count=","primitive="])
     except getopt.GetoptError:
         print man
         sys.exit(2)
@@ -43,30 +48,46 @@ def main(argv):
             elif arg == "square":
                 primitive = SquarePrimitive
             else:
-                print 'Primitive not recognized'
+                print 'Primitive not supported'
                 sys.exit(2)
+        elif opt in ("-m", "--method"):
+            if arg == "random":
+                method = RandomMethod
+            elif arg == "hillclimb":
+                method = HillClimbMethod
+            elif arg == "annealing":
+                method = SimulatedAnnealingMethod
+            elif arg == "gradient":
+                method = GradientDescentMethod
+            else:
+                print 'Method not supported'
+                sys.exit(2)
+        elif opt in ("-s", "--seed"):
+            seed = arg
     if not inputfile:
+        print "Input file needed"
         print man
         sys.exit(2)
-    else:
-        random.seed()
-        img = loadImage(inputfile)
-        if img is None:
-            print man
-            sys.exit(2)
-        # result = randomGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=4000)
-        # result = annealingGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=400, T0=30, Tf=0.01, tau=0.99)
-        # result = hillClimbGeneration(img, shapesCount, primitive, maxSize=256, randomIterations=400, randomPopSelection=0.10, hillClimbIterations=40)
-        result = gradientGeneration(img, shapesCount, primitive, maxSize=256, randomPopSelection=0.25, randomIterations=100)
+    return (inputfile, outputfile, shapesCount, primitive, method, seed)
 
-
-        if not outputfile:
-            outputfile = '{}_{}_{:1.0f}.png'.format(os.path.splitext(os.path.basename(inputfile))[0], shapesCount, rmse(result, np.asarray(img, dtype=np.float32)))
-        cv2.imwrite(outputfile, result)
-
-        plt.axis('off')
-        plt.imshow(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
-        plt.show()
+def main(argv):
+    (inputfile, outputfile, shapesCount, primitive, method, seed) = parseArguments(argv)
+    # Load image
+    img = loadImage(inputfile)
+    if img is None:
+        print "Input file is not an image"
+        sys.exit(2)
+    # Process image
+    random.seed(seed)
+    result = method(shapesCount, primitive, maxSize=240, randomIterations=100).process(img)
+    # Export result
+    if not outputfile:
+        outputfile = '{}_{}_{:1.0f}.png'.format(os.path.splitext(os.path.basename(inputfile))[0], shapesCount, Method.rmse(result, np.asarray(img, dtype=np.float32)))
+    cv2.imwrite(outputfile, result)
+    # Show result
+    plt.axis('off')
+    plt.imshow(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+    plt.show()
 
 
 if __name__ == "__main__":

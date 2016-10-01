@@ -21,14 +21,6 @@ class Primitive(object):
     def getState(self):
         raise NotImplementedError()
 
-    def computeGradient(self, h, canvas, reference):
-        energy = rmse(self.apply(canvas), reference)
-        X = self.getState()
-        I = np.identity(X.size)
-        Xh = X+I*h
-        g = (np.array([rmse(self.__class__.generateFromState(Xh[i,:]).apply(canvas), reference) for i in range(X.size)]) - energy)/h
-        return g
-
     def __str__(self):
         raise NotImplementedError()
 
@@ -268,6 +260,3 @@ class SquarePrimitive(RectanglePrimitive):
 
 def scale(data, ratio):
     return tuple((np.asarray(data)*np.asarray(ratio)).astype(int))
-
-def rmse(image, reference):
-    return np.linalg.norm(reference - np.asarray(image, dtype=np.float32))

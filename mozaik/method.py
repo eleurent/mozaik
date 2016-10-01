@@ -1,116 +1,147 @@
 from primitive import *
 
-def resize(img, maxSize):
-    if img.shape[1] > maxSize:
-        img = cv2.resize(img, (0,0), fx=float(maxSize)/img.shape[1], fy=float(maxSize)/img.shape[1])
-    if img.shape[0] > maxSize:
-        img = cv2.resize(img, (0,0), fx=float(maxSize)/img.shape[0], fy=float(maxSize)/img.shape[0])
-    return img
+class Method(object):
+    def __init__(self, shapesCount, primitive, maxSize):
+        self.shapesCount = shapesCount
+        self.primitive = primitive
+        self.maxSize = maxSize
 
-def initBackground(img):
-    bgImg = np.zeros(img.shape, np.uint8)
-    bgColor =  np.uint8(np.average(np.average(img, axis=0), axis=0))
-    bgImg[:,:] = bgColor
-    return bgImg
+    def generateNewShape(self, canvas, reference):
+        raise NotImplementedError()
 
-def randomGeneration(img, shapesCount, primitive, maxSize, randomIterations):
-    reference = np.asarray(resize(img, maxSize), dtype=np.float32)
-    canvas = initBackground(reference)
-    result = initBackground(img)
-    for i in range(shapesCount):
-        shapes = [primitive.generateRandom() for k in range(randomIterations)]
-        energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
-        bestShape = shapes[energies.argmin()]
-        canvas = bestShape.apply(canvas)
-        result = bestShape.apply(result)
-        print '({}/{}) Canvas error: {:1.0f}'.format(i+1, shapesCount, rmse(canvas, reference))
-    return result
+    def process(self, img):
+        (reference, canvas, result) = self.newCanvas(img)
+        for i in range(self.shapesCount):
+            shape = self.generateNewShape(canvas, reference)
+            (canvas, result) = Method.addShape(shape, canvas, result)
+            print '({}/{}) Canvas error: {:1.0f}'.format(i+1, self.shapesCount, Method.rmse(canvas, reference))
+        return result
 
-def hillClimbGeneration(img, shapesCount, primitive, maxSize, randomIterations, randomPopSelection, hillClimbIterations):
-    reference = np.asarray(resize(img, maxSize), dtype=np.float32)
-    canvas = initBackground(reference)
-    result = initBackground(img)
-    for i in range(shapesCount):
-        # Random population generation
-        shapes = [primitive.generateRandom() for k in range(randomIterations)]
-        energies = [rmse(shape.apply(canvas), reference) for shape in shapes]
-        # Random population selection
-        n = min(int(randomIterations*randomPopSelection), randomPopSelection-1)
+    def newCanvas(self, img):
+        reference = np.asarray(Method.boundImage(img, self.maxSize), dtype=np.float32)
+        canvas = Method.backgroundImage(reference)
+        result = Method.backgroundImage(img)
+        return (reference, canvas, result)
+
+    @staticmethod
+    def addShape(shape, canvas, result):
+        return (shape.apply(canvas), shape.apply(result))
+
+    @staticmethod
+    def boundImage(img, maxSize):
+        if img.shape[1] > maxSize:
+            img = cv2.resize(img, (0,0), fx=float(maxSize)/img.shape[1], fy=float(maxSize)/img.shape[1])
+        if img.shape[0] > maxSize:
+            img = cv2.resize(img, (0,0), fx=float(maxSize)/img.shape[0], fy=float(maxSize)/img.shape[0])
+        return img
+
+    @staticmethod
+    def backgroundImage(img):
+        bgImg = np.zeros(img.shape, np.uint8)
+        bgColor =  np.uint8(np.average(np.average(img, axis=0), axis=0))
+        bgImg[:,:] = bgColor
+        return bgImg
+
+    @staticmethod
+    def rmse(image, reference):
+        return np.linalg.norm(reference - np.asarray(image, dtype=np.float32))
+
+    @staticmethod
+    def populationSelection(shapes, energies, n):
         indexes = energies.argpartition(n)[:n+1]
-        shapes = shapes[indexes]
-        energies = energies[indexes]
+        return (shapes[indexes], energies[indexes])
+
+
+class RandomMethod(Method):
+    def __init__(self, shapesCount, primitive, maxSize, randomIterations):
+        super(RandomMethod, self).__init__(shapesCount, primitive, maxSize)
+        self.randomIterations = randomIterations
+
+    def generateNewShape(self, canvas, reference):
+        (shapes, errors) = self.generateRandomShapes(canvas, reference)
+        return shapes[errors.argmin()]
+
+    def generateRandomShapes(self, canvas, reference):
+        shapes = np.array([self.primitive.generateRandom() for k in range(self.randomIterations)])
+        errors = np.array([Method.rmse(shape.apply(canvas), reference) for shape in shapes])
+        return (shapes, errors)
+
+
+class HillClimbMethod(RandomMethod):
+    def __init__(self, shapesCount, primitive, maxSize, randomIterations, selectionRate=0.25, hillClimbIterations=20):
+        super(HillClimbMethod, self).__init__(shapesCount, primitive, maxSize, randomIterations)
+        self.selectionRate = selectionRate
+        self.hillClimbIterations = hillClimbIterations
+
+    def generateNewShape(self, canvas, reference):
+        [shapes, energies] = self.generateRandomShapes(canvas, reference)
+        [shapes, energies] = Method.populationSelection(shapes, energies, n = min(int(self.randomIterations*self.selectionRate), self.randomIterations-1))
+        # Hillclimbing of selected random shapes
         for j, shape in enumerate(shapes):
             energy = energies[j]
-            # Hillclimbing of selected random shapes
             for k in range(hillClimbIterations):
                 newShape = shape.generateNeighbour()
-                newEnergy = rmse(newShape.apply(canvas), reference)
+                newEnergy = Method.rmse(newShape.apply(canvas), reference)
                 if newEnergy < energy:
-                    shape = newShape
-                    energy = newEnergy
-                shapes[j] = shape
-        energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
-        bestShape = shapes[energies.argmin()]
-        canvas = bestShape.apply(canvas)
-        result = bestShape.apply(result)
-        print '({}/{}) Canvas error: {:1.0f}'.format(i+1, shapesCount, rmse(canvas, reference))
-    return result
+                    (shape, energy) = (newShape, newEnergy)
+            (shapes[j], energies[j]) = (shape, energy)
+        energies = np.array([Method.rmse(shape.apply(canvas), reference) for shape in shapes])
+        return shapes[energies.argmin()]
 
-def annealingGeneration(img, shapesCount, primitive, maxSize, randomIterations, T0, Tf, tau):
-    reference = np.asarray(resize(img, maxSize), dtype=np.float32)
-    canvas = initBackground(reference)
-    result = initBackground(img)
-    for i in range(shapesCount):
-        shapes = [primitive.generateRandom() for k in range(randomIterations)]
-        energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
-        k = energies.argmin()
-        shape = shapes[k]
-        energy = rmse(shape.apply(canvas), reference)
-        # print "Selected random seed: {}".format(energy)
-        T = T0
-        while T > Tf:
+
+class SimulatedAnnealingMethod(RandomMethod):
+    def __init__(self, shapesCount, primitive, maxSize, randomIterations, T0=30, Tf=0.01, tau=0.99):
+        super(SimulatedAnnealingMethod, self).__init__(shapesCount, primitive, maxSize, randomIterations)
+        self.T0 = T0
+        self.Tf = Tf
+        self.tau = tau
+
+    def generateNewShape(self, canvas, reference):
+        [shapes, energies] = self.generateRandomShapes(canvas, reference)
+        shape = shapes[energies.argmin()]
+        energy = Method.rmse(shape.apply(canvas), reference)
+        T = self.T0
+        while T > self.Tf:
             newShape = shape.generateNeighbour()
-            newEnergy = rmse(newShape.apply(canvas), reference)
+            newEnergy = Method.rmse(newShape.apply(canvas), reference)
             if newEnergy < energy or random.random() < np.exp(-(newEnergy-energy)/T):
-                shape = newShape
-                energy = newEnergy
-            T = tau*T
-        canvas = shape.apply(canvas)
-        result = shape.apply(result)
-        print '({}/{}) Canvas error: {:1.0f}'.format(i+1, shapesCount, rmse(canvas, reference))
-    return result
+                (shape, energy) = (newShape, newEnergy)
+            T = self.tau*T
+        return shape
 
-def gradientGeneration(img, shapesCount, primitive, maxSize, randomIterations, randomPopSelection):
-    reference = np.asarray(resize(img, maxSize), dtype=np.float32)
-    canvas = initBackground(reference)
-    result = initBackground(img)
-    h = 0.01
-    for i in range(shapesCount):
-        # Random population generation
-        shapes = np.array([primitive.generateRandom() for k in range(randomIterations)])
-        energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
-        # Random population selection
-        n = min(int(randomIterations*randomPopSelection), randomIterations-1)
-        indexes = np.argpartition(energies, n)[:n+1]
-        shapes = shapes[indexes]
-        energies = energies[indexes]
+
+class GradientDescentMethod(RandomMethod):
+    def __init__(self, shapesCount, primitive, maxSize, randomIterations, selectionRate=0.25, gammaInit=1.0e-5, gammaMin=1.0e-9, gammaRate=0.3, h=0.01):
+        super(GradientDescentMethod, self).__init__(shapesCount, primitive, maxSize, randomIterations)
+        self.selectionRate = selectionRate
+        self.gammaInit = gammaInit
+        self.gammaMin = gammaMin
+        self.gammaRate = gammaRate
+        self.h = h
+
+    def generateNewShape(self, canvas, reference):
+        [shapes, energies] = self.generateRandomShapes(canvas, reference)
+        [shapes, energies] = Method.populationSelection(shapes, energies, n = min(int(self.randomIterations*self.selectionRate), self.randomIterations-1))
+        # Gradient descent of selected random shapes
         for j, shape in enumerate(shapes):
             energy = energies[j]
-            # Gradient descent of selected random shapes
-            beta = 1.0e-6
-            while beta > 1.0e-9:
-                g = shape.computeGradient(h, canvas, reference)
-                newShape = primitive.generateFromState(shape.getState() - g*beta)
-                newEnergy = rmse(newShape.apply(canvas), reference)
+            gamma = self.gammaInit
+            while gamma > self.gammaMin:
+                g = GradientDescentMethod.computeGradient(shape, self.h, canvas, reference)
+                newShape = shape.generateFromState(shape.getState() - g*gamma)
+                newEnergy = Method.rmse(newShape.apply(canvas), reference)
                 if newEnergy < energy:
-                    shape = newShape
-                    energy = newEnergy
+                    (shape, energy) = (newShape, newEnergy)
                 else:
-                    beta = beta*0.3
-            shapes[j] = shape
-        energies = np.array([rmse(shape.apply(canvas), reference) for shape in shapes])
-        bestShape = shapes[energies.argmin()]
-        canvas = bestShape.apply(canvas)
-        result = bestShape.apply(result)
-        print '({}/{}) Canvas error: {:1.0f}'.format(i+1, shapesCount, rmse(canvas, reference))
-    return result
+                    gamma *= self.gammaRate
+            (shapes[j], energies[j]) = (shape, energy)
+        return shapes[energies.argmin()]
+
+    @staticmethod
+    def computeGradient(shape, h, canvas, reference):
+        energy = Method.rmse(shape.apply(canvas), reference)
+        X = shape.getState()
+        I = np.identity(X.size)
+        Xh = X+I*h
+        g = (np.array([Method.rmse(shape.generateFromState(Xh[i,:]).apply(canvas), reference) for i in range(X.size)]) - energy)/h
+        return g
