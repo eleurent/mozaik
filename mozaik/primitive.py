@@ -200,13 +200,13 @@ class EllipsePrimitive(Primitive):
 
 class CirclePrimitive(EllipsePrimitive):
     def __init__(self, ellipse):
-        super(CirclePrimitive, self).init(ellipse.center, ellipse.axes, ellipse.angle, ellipse.color, ellipse.alpha)
+        super(CirclePrimitive, self).__init__(ellipse.center, ellipse.axes, ellipse.angle, ellipse.color, ellipse.alpha)
 
     def apply(self, img):
         overlay = img.copy()
         output = img.copy()
         size = img.shape[1::-1]
-        cv2.ellipse(overlay,scale(self.center, size),self.axes[0]*size[0]*np.ones(2,1),self.angle*360,0,360,scale(self.color, 255),-1)
+        cv2.circle(overlay,scale(self.center, size),int(self.axes[0]*size[0]),scale(self.color, 255),-1)
         cv2.addWeighted(overlay, self.alpha, output, 1 - self.alpha, 0, output)
         return output
 
