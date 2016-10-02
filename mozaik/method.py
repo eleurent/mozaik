@@ -79,13 +79,12 @@ class HillClimbMethod(RandomMethod):
         # Hillclimbing of selected random shapes
         for j, shape in enumerate(shapes):
             energy = energies[j]
-            for k in range(hillClimbIterations):
+            for k in range(self.hillClimbIterations):
                 newShape = shape.generateNeighbour()
                 newEnergy = Method.rmse(newShape.apply(canvas), reference)
                 if newEnergy < energy:
                     (shape, energy) = (newShape, newEnergy)
             (shapes[j], energies[j]) = (shape, energy)
-        energies = np.array([Method.rmse(shape.apply(canvas), reference) for shape in shapes])
         return shapes[energies.argmin()]
 
 
