@@ -1,11 +1,10 @@
 from nose.tools import *
-import mozaik.primitive
 from mozaik.primitive import RectanglePrimitive, TrianglePrimitive, EllipsePrimitive, CirclePrimitive, SquarePrimitive
+from mozaik.method import Method, RandomMethod, HillClimbMethod, SimulatedAnnealingMethod, GradientDescentMethod
 import numpy as np
+import cv2
 
 class TestPrimitive:
-    img = []
-
     def setup(self):
         pass
 
@@ -14,7 +13,7 @@ class TestPrimitive:
 
     @classmethod
     def setup_class(cls):
-        cls.img = np.zeros((5,5,3))
+        cls.img = np.zeros((100,100,3))
 
     @classmethod
     def teardown_class(cls):
@@ -52,6 +51,7 @@ class TestPrimitive:
         shapeA = primitive.generateRandom()
         shapeB = shapeA.generateNeighbour()
         threshold = 0.1
+        assert shapeA.__class__ == shapeB.__class__
         assert abs(shapeA.alpha - shapeB.alpha) < threshold
         assert np.all(abs(shapeA.color - shapeB.color) < threshold)
         if hasattr(primitive, 'positionA'):
@@ -79,3 +79,41 @@ class TestPrimitive:
 
     def test_neighbour_square(self):
         self.assert_neighbour_primitive(SquarePrimitive)
+
+class TestMethod:
+    def setup(self):
+        pass
+
+    def teardown(self):
+        pass
+
+    @classmethod
+    def setup_class(cls):
+        cls.img = np.zeros((100,100,3), dtype='uint8')
+        cv2.rectangle(cls.img, (0,0), (50,50), (255,0,0), -1)
+        cv2.rectangle(cls.img, (50,0), (100,50), (0,255,0), -1)
+        cv2.rectangle(cls.img, (0,50), (50,100), (0,0,255), -1)
+        cv2.rectangle(cls.img, (50,50), (100,100), (255,255,0), -1)
+
+    @classmethod
+    def teardown_class(cls):
+        pass
+
+    def assert_method(self, method, threshold):
+        print method
+        result = method.process(self.img)
+        error = Method.rmse(result,  np.asarray(self.img, dtype = np.float32))
+        assert result.size == self.img.size
+        assert error < threshold
+
+    def test_random_method(self):
+        self.assert_method(RandomMethod(shapesCount=4, primitive=RectanglePrimitive, maxSize=240, randomIterations=1000), 19000)
+
+    def test_hillclimb_method(self):
+        self.assert_method(HillClimbMethod(shapesCount=4, primitive=RectanglePrimitive, maxSize=240, randomIterations=100), 17000)
+
+    def test_annealing_method(self):
+        self.assert_method(SimulatedAnnealingMethod(shapesCount=4, primitive=RectanglePrimitive, maxSize=240, randomIterations=100), 12000)
+
+    def test_gradient_descent_method(self):
+        self.assert_method(GradientDescentMethod(shapesCount=4, primitive=RectanglePrimitive, maxSize=240, randomIterations=100), 17000)
