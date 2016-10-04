@@ -10,22 +10,36 @@ class Method(object):
         raise NotImplementedError()
 
     def process(self, img):
-        (reference, canvas, result) = self.newCanvas(img)
+        (reference, canvas, rendering) = self.newCanvas(img)
+        shapes = []
         for i in range(self.shapesCount):
             shape = self.generateNewShape(canvas, reference)
-            (canvas, result) = Method.addShape(shape, canvas, result)
+            canvas = shape.apply(canvas)
+            shapes.append(shape)
             print '({}/{}) Canvas error: {:1.0f}'.format(i+1, self.shapesCount, Method.rmse(canvas, reference))
-        return result
+        return (Method.render(shapes, rendering), shapes)
 
     def newCanvas(self, img):
         reference = np.asarray(Method.boundImage(img, self.maxSize), dtype=np.float32)
         canvas = Method.backgroundImage(reference)
-        result = Method.backgroundImage(img)
-        return (reference, canvas, result)
+        rendering = Method.backgroundImage(img)
+        return (reference, canvas, rendering)
 
     @staticmethod
-    def addShape(shape, canvas, result):
-        return (shape.apply(canvas), shape.apply(result))
+    def render(shapes, rendering):
+        for shape in shapes:
+            rendering = shape.apply(rendering)
+        return rendering
+
+    @staticmethod
+    def renderIntermediates(shapes, rendering, n):
+        r = len(shapes)**(1./n)
+        renderings = []
+        for i in range(n-1):
+            rendering = Method.render(shapes[int(r**(i))-1:int(r**(i+1))-1], rendering)
+            renderings.append(rendering)
+        renderings.append(Method.render(shapes[int(r**(n-1))-1:], rendering))
+        return renderings
 
     @staticmethod
     def boundImage(img, maxSize):
@@ -68,7 +82,7 @@ class RandomMethod(Method):
 
 
 class HillClimbMethod(RandomMethod):
-    def __init__(self, shapesCount, primitive, maxSize, randomIterations, selectionRate=0.25, hillClimbIterations=20):
+    def __init__(self, shapesCount, primitive, maxSize, randomIterations, selectionRate=0.5, hillClimbIterations=500):
         super(HillClimbMethod, self).__init__(shapesCount, primitive, maxSize, randomIterations)
         self.selectionRate = selectionRate
         self.hillClimbIterations = hillClimbIterations
